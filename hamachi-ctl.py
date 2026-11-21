@@ -107,7 +107,9 @@ def hamachi_action(args, secret=""):
             break
         time.sleep(2)
     text = text.replace("Password:", "").strip()
-    failed = rc != 0 or ".. failed" in text or "error" in text.lower()
+    # hamachi always exits 0; success lines end in ".. ok", failures in ".. failed, <reason>".
+    # Do not grep for words like "error": network IDs and nicknames are echoed back.
+    failed = rc != 0 or ".. failed" in text or not re.search(r"\.{2,}\s*ok\b", text)
     return not failed, text
 
 
