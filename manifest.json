@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.danfimov.hamachi",
+  "name": "Hamachi",
+  "version": "0.1.0",
+  "author": "danfimov",
+  "license": "MIT",
+  "description": "LogMeIn Hamachi status, networks and peers in the Omarchy bar.",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Panel.qml" },
+  "barWidget": {
+    "displayName": "Hamachi",
+    "description": "Go online/offline, toggle networks, copy peer IPs.",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": { "refreshIntervalSec": 15 },
+    "schema": [
+      { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)",
+        "min": 5, "max": 3600, "step": 5, "defaultValue": 15 }
+    ]
+  }
+}
