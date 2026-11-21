@@ -27,6 +27,10 @@ Panel {
   property bool messageIsError: false
   // "" | "join" | "create" | "nick": which inline form is open
   property string formMode: ""
+  // Unsent form input per mode ({ first, secret }), kept in memory only, so
+  // closing the panel to copy a password elsewhere doesn't lose the network ID.
+  // Cleared when the form is submitted or cancelled.
+  property var drafts: ({})
   // network id waiting for a second click to confirm leave/delete
   property string confirmId: ""
 
@@ -44,6 +48,20 @@ Panel {
     var n = 0
     for (var i = 0; i < (net.peers || []).length; i++) if (net.peers[i].online) n++
     return n
+  }
+
+  // "<id> · only you · 1/5" or "<id> · 2 of 3 online · 3/5". The peer list
+  // never includes this computer, while hamachi's capacity does.
+  function networkMeta(net) {
+    var parts = []
+    if (String(net.id) !== String(net.name)) parts.push(String(net.id))
+    var total = (net.peers || []).length
+    if (total === 0) parts.push(strings.t("onlyYou"))
+    else parts.push(strings.t("peersOnline")
+                      .arg(Commons.I18n.formatNumber(onlinePeers(net)))
+                      .arg(Commons.I18n.formatNumber(total)))
+    if (net.capacity) parts.push(String(net.capacity))
+    return parts.join(" · ")
   }
 
   function statusLine() {
@@ -79,7 +97,21 @@ Panel {
     if (formMode === "join") act(["join", value], secret)
     else if (formMode === "create") act(["create", value], secret)
     else if (formMode === "nick") act(["set-nick", value])
+    clearDraft(formMode)
     formMode = ""
+  }
+
+  function cancelForm() {
+    clearDraft(formMode)
+    formMode = ""
+  }
+
+  function saveDraft(mode, first, secret) {
+    if (mode !== "") drafts[mode] = { first: String(first), secret: String(secret) }
+  }
+
+  function clearDraft(mode) {
+    delete drafts[mode]
   }
 
   function leaveOrDelete(net) {
@@ -312,10 +344,31 @@ Panel {
             spacing: Style.space(6)
             readonly property bool wantsPassword: root.formMode === "join" || root.formMode === "create"
 
-            onVisibleChanged: if (visible) {
-              firstField.text = root.formMode === "nick" ? String(root.hs.nickname || "") : ""
-              secretField.text = ""
-              Qt.callLater(function() { firstField.forceActiveFocus(); firstField.selectAll() })
+            property bool restoring: false
+
+            function restore() {
+              if (!visible) return
+              var d = root.drafts[root.formMode]
+              restoring = true
+              firstField.text = d ? d.first : (root.formMode === "nick" ? String(root.hs.nickname || "") : "")
+              secretField.text = d ? d.secret : ""
+              restoring = false
+              // Back with the password in the clipboard: land straight in the password field.
+              var toSecret = wantsPassword && firstField.text !== "" && secretField.text === "" && !!d
+              Qt.callLater(function() {
+                if (toSecret) secretField.forceActiveFocus()
+                else { firstField.forceActiveFocus(); firstField.selectAll() }
+              })
+            }
+            function save() {
+              if (!restoring) root.saveDraft(root.formMode, firstField.text, secretField.text)
+            }
+
+            onVisibleChanged: restore()
+            Component.onCompleted: restore()
+            Connections {
+              target: root
+              function onFormModeChanged() { form.restore() }
             }
 
             TextField {
@@ -325,8 +378,9 @@ Panel {
               foreground: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              onTextChanged: form.save()
               onAccepted: form.wantsPassword ? secretField.forceActiveFocus() : root.submitForm(text, "")
-              Keys.onEscapePressed: function(e) { root.formMode = ""; e.accepted = true }
+              Keys.onEscapePressed: function(e) { root.cancelForm(); e.accepted = true }
             }
             TextField {
               id: secretField
@@ -337,8 +391,9 @@ Panel {
               foreground: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              onTextChanged: form.save()
               onAccepted: root.submitForm(firstField.text, text)
-              Keys.onEscapePressed: function(e) { root.formMode = ""; e.accepted = true }
+              Keys.onEscapePressed: function(e) { root.cancelForm(); e.accepted = true }
             }
             Row {
               spacing: Style.space(6)
@@ -356,7 +411,7 @@ Panel {
                 foreground: root.foreground
                 fontFamily: root.fontFamily
                 fontSize: Style.font.bodySmall
-                onClicked: root.formMode = ""
+                onClicked: root.cancelForm()
               }
             }
           }
@@ -458,7 +513,7 @@ Panel {
         Text {
           textFormat: Text.PlainText
           Layout.fillWidth: true
-          text: String(block.net.id) + " · " + strings.tn("members", root.onlinePeers(block.net)).arg(Commons.I18n.formatNumber(root.onlinePeers(block.net)))
+          text: root.networkMeta(block.net)
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
