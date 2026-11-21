@@ -50,6 +50,20 @@ Panel {
     return n
   }
 
+  // "<id> · only you · 1/5" or "<id> · 2 of 3 online · 3/5". The peer list
+  // never includes this computer, while hamachi's capacity does.
+  function networkMeta(net) {
+    var parts = []
+    if (String(net.id) !== String(net.name)) parts.push(String(net.id))
+    var total = (net.peers || []).length
+    if (total === 0) parts.push(strings.t("onlyYou"))
+    else parts.push(strings.t("peersOnline")
+                      .arg(Commons.I18n.formatNumber(onlinePeers(net)))
+                      .arg(Commons.I18n.formatNumber(total)))
+    if (net.capacity) parts.push(String(net.capacity))
+    return parts.join(" · ")
+  }
+
   function statusLine() {
     if (!hs.installed) return strings.t("notInstalled")
     if (!hs.daemon) return strings.t("daemonStopped")
@@ -499,7 +513,7 @@ Panel {
         Text {
           textFormat: Text.PlainText
           Layout.fillWidth: true
-          text: String(block.net.id) + " · " + strings.tn("members", root.onlinePeers(block.net)).arg(Commons.I18n.formatNumber(root.onlinePeers(block.net)))
+          text: root.networkMeta(block.net)
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption

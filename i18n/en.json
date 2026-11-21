@@ -15,10 +15,6 @@
   "clientId": "Client ID",
   "networks": "Networks",
   "noNetworks": "No networks joined",
-  "members": {
-    "one": "%1 member online",
-    "other": "%1 members online"
-  },
   "copied": "Copied %1",
   "offlinePeer": "offline",
   "hint": "Click a peer to copy its IP · j join · c create · n nickname · r refresh · t toggle",
@@ -32,5 +28,7 @@
   "passwordNew": "Password for the new network",
   "leaveNetwork": "Leave network",
   "deleteNetwork": "Delete network (you are the owner)",
-  "clickAgain": "Click again to confirm"
+  "clickAgain": "Click again to confirm",
+  "onlyYou": "only you",
+  "peersOnline": "%1 of %2 online"
 }
