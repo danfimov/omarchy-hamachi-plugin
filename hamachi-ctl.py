@@ -7,6 +7,7 @@
   hamachi-ctl.py join|create <network-id>   (password in $HAMACHI_PASS)
   hamachi-ctl.py leave|delete <network-id>
   hamachi-ctl.py set-nick <nickname>
+  hamachi-ctl.py copy                   -> copies $HAMACHI_COPY via wl-copy stdin
   hamachi-ctl.py start-daemon           -> pkexec systemctl start logmein-hamachi
 """
 import json, os, re, shutil, subprocess, sys, time
@@ -76,7 +77,10 @@ def parse_list(text):
 def status():
     out = {"installed": bool(shutil.which("hamachi")), "daemon": False,
            "permission": True, "online": False, "status": "", "clientId": "",
-           "address": "", "nickname": "", "networks": [], "error": ""}
+           "address": "", "nickname": "", "networks": [], "error": "",
+           # False when hamachi could not be asked; the panel then shows
+           # "status unknown" instead of guessing "offline".
+           "known": True}
     if not out["installed"]:
         return out
     rc, _ = run(["systemctl", "is-active", "--quiet", "logmein-hamachi"], 5)
@@ -88,6 +92,12 @@ def status():
         out["permission"] = False
         return out
     info = parse_info(text)
+    # Plain `hamachi` exits 1 even when it prints a full status, so judge by
+    # whether the status line is there, not by the exit code.
+    if not info.get("status"):
+        out["known"] = False
+        out["error"] = "hamachi status unavailable"
+        return out
     out["status"] = clip(info.get("status", ""), 32)
     out["online"] = out["status"] == "logged in"
     out["clientId"] = clip(info.get("client id", ""), 16)
@@ -124,6 +134,15 @@ def main(argv):
     if cmd == "status":
         print(json.dumps(status()))
         return 0
+    if cmd == "copy":
+        # The value comes in the environment and goes to wl-copy on stdin, so
+        # it never shows up in process arguments.
+        try:
+            p = subprocess.run(["wl-copy"], input=os.environ.get("HAMACHI_COPY", ""),
+                               text=True, timeout=5)
+            return p.returncode
+        except (OSError, subprocess.TimeoutExpired):
+            return 1
     if cmd in ("login", "logout"):
         ok, text = hamachi_action([cmd])
     elif cmd in ("go-online", "go-offline", "leave", "delete") and ID_RE.match(arg):

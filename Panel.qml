@@ -34,7 +34,13 @@ Panel {
   // network id waiting for a second click to confirm leave/delete
   property string confirmId: ""
 
-  readonly property bool usable: hs.installed && hs.daemon && hs.permission
+  // statusKnown is false until the first successful status read, and whenever
+  // the helper or hamachi fails: the real VPN state is then unknown, which the
+  // panel must not present as "offline".
+  property bool statusKnown: false
+  property bool everLoaded: false
+  property string pendingCopy: ""
+  readonly property bool usable: statusKnown && hs.installed && hs.daemon && hs.permission
   readonly property bool online: usable && hs.online === true
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
@@ -65,6 +71,7 @@ Panel {
   }
 
   function statusLine() {
+    if (!statusKnown) return everLoaded ? strings.t("statusUnknown") : strings.t("checking")
     if (!hs.installed) return strings.t("notInstalled")
     if (!hs.daemon) return strings.t("daemonStopped")
     if (!hs.permission) return strings.t("noPermission")
@@ -135,7 +142,10 @@ Panel {
 
   function copy(text) {
     if (!text) return
-    Quickshell.execDetached(["wl-copy", "--", String(text)])
+    // Via the helper's stdin path: wl-copy arguments would be visible in ps.
+    if (copyProc.running) { pendingCopy = String(text); return }
+    copyProc.environment = { HAMACHI_COPY: String(text) }
+    copyProc.running = true
     message = strings.t("copied").arg(text)
     messageIsError = false
   }
@@ -154,8 +164,27 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        try { root.hs = JSON.parse(String(text || "{}")) } catch (e) {}
+        var parsed = null
+        try { parsed = JSON.parse(String(text || "")) } catch (e) { parsed = null }
+        root.everLoaded = true
+        if (parsed && typeof parsed === "object" && parsed.known !== false) {
+          root.hs = parsed
+          root.statusKnown = true
+        } else {
+          root.statusKnown = false
+        }
       }
+    }
+  }
+
+  Process {
+    id: copyProc
+    command: ["python3", root.helper, "copy"]
+    onExited: {
+      if (root.pendingCopy === "") return
+      var next = root.pendingCopy
+      root.pendingCopy = ""
+      root.copy(next)
     }
   }
 
@@ -290,7 +319,7 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              visible: !root.hs.permission
+              visible: root.statusKnown && !root.hs.permission
               width: parent.width
               wrapMode: Text.WordWrap
               text: strings.t("noPermissionHelp")
@@ -300,7 +329,7 @@ Panel {
             }
 
             Row {
-              visible: root.hs.installed && !root.hs.daemon
+              visible: root.statusKnown && root.hs.installed && !root.hs.daemon
               spacing: Style.space(8)
               PanelActionButton {
                 iconText: ""

@@ -31,5 +31,7 @@
   "clickAgain": "Click again to confirm",
   "onlyYou": "only you",
   "peersOnline": "%1 of %2 online",
-  "copyNetworkId": "Click to copy network ID"
+  "copyNetworkId": "Click to copy network ID",
+  "statusUnknown": "Status unknown",
+  "checking": "Checking…"
 }
