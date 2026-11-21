@@ -101,6 +101,13 @@ Panel {
     formMode = ""
   }
 
+  function openJoinForm(id) {
+    open()
+    drafts["join"] = { first: String(id || "").trim().slice(0, 64), secret: "" }
+    if (formMode === "join") formMode = ""
+    formMode = "join"
+  }
+
   function cancelForm() {
     clearDraft(formMode)
     formMode = ""
@@ -188,7 +195,9 @@ Panel {
     function logout(): string { root.act(["logout"]); return "ok" }
     function status(): string { return root.online ? "online" : "offline" }
     function form(mode: string): void { root.open(); root.formMode = mode }
-    function join(id: string, password: string): string { root.act(["join", id], password); return "ok" }
+    // Opens the join form with the ID filled in. Deliberately takes no
+    // password: IPC arguments are visible to other local users in ps.
+    function join(id: string): void { root.openJoinForm(id) }
   }
 
   BarIconButton {
@@ -347,6 +356,10 @@ Panel {
             property bool restoring: false
 
             function restore() {
+              // Never carry a password from one form (or network) into another.
+              restoring = true
+              secretField.text = ""
+              restoring = false
               if (!visible) return
               var d = root.drafts[root.formMode]
               restoring = true

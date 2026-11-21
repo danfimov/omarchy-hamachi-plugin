@@ -64,6 +64,7 @@ IPC, handy for keybindings:
 ```bash
 omarchy-shell io.github.danfimov.hamachi toggle        # open / close the panel
 omarchy-shell io.github.danfimov.hamachi form join     # open the panel on the join form
+omarchy-shell io.github.danfimov.hamachi join <network-id>  # join form with the ID filled in
 omarchy-shell io.github.danfimov.hamachi login         # also: logout, refresh, status
 ```
 
@@ -79,8 +80,11 @@ In the widget's entry in `~/.config/omarchy/shell.json`:
 
 `Panel.qml` never talks to Hamachi directly. It runs `hamachi-ctl.py`, which calls the
 `hamachi` CLI with a fixed set of commands, validates network IDs and nicknames, and
-returns JSON. Network passwords are passed to `hamachi` on standard input (through an
-environment variable to the helper), so they never appear in process arguments.
+returns JSON. Network passwords are only typed into the panel. They are passed to `hamachi` on
+standard input (through an environment variable to the helper), so they never appear in
+process arguments, and the IPC interface deliberately has no way to pass a password.
+Each form keeps its own unsent input, so switching between Join and Create never
+reuses a password typed into the other form.
 
 ## Removal
 
