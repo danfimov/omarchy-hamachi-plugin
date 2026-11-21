@@ -27,6 +27,10 @@ Panel {
   property bool messageIsError: false
   // "" | "join" | "create" | "nick": which inline form is open
   property string formMode: ""
+  // Unsent form input per mode ({ first, secret }), kept in memory only, so
+  // closing the panel to copy a password elsewhere doesn't lose the network ID.
+  // Cleared when the form is submitted or cancelled.
+  property var drafts: ({})
   // network id waiting for a second click to confirm leave/delete
   property string confirmId: ""
 
@@ -79,7 +83,21 @@ Panel {
     if (formMode === "join") act(["join", value], secret)
     else if (formMode === "create") act(["create", value], secret)
     else if (formMode === "nick") act(["set-nick", value])
+    clearDraft(formMode)
     formMode = ""
+  }
+
+  function cancelForm() {
+    clearDraft(formMode)
+    formMode = ""
+  }
+
+  function saveDraft(mode, first, secret) {
+    if (mode !== "") drafts[mode] = { first: String(first), secret: String(secret) }
+  }
+
+  function clearDraft(mode) {
+    delete drafts[mode]
   }
 
   function leaveOrDelete(net) {
@@ -312,10 +330,31 @@ Panel {
             spacing: Style.space(6)
             readonly property bool wantsPassword: root.formMode === "join" || root.formMode === "create"
 
-            onVisibleChanged: if (visible) {
-              firstField.text = root.formMode === "nick" ? String(root.hs.nickname || "") : ""
-              secretField.text = ""
-              Qt.callLater(function() { firstField.forceActiveFocus(); firstField.selectAll() })
+            property bool restoring: false
+
+            function restore() {
+              if (!visible) return
+              var d = root.drafts[root.formMode]
+              restoring = true
+              firstField.text = d ? d.first : (root.formMode === "nick" ? String(root.hs.nickname || "") : "")
+              secretField.text = d ? d.secret : ""
+              restoring = false
+              // Back with the password in the clipboard: land straight in the password field.
+              var toSecret = wantsPassword && firstField.text !== "" && secretField.text === "" && !!d
+              Qt.callLater(function() {
+                if (toSecret) secretField.forceActiveFocus()
+                else { firstField.forceActiveFocus(); firstField.selectAll() }
+              })
+            }
+            function save() {
+              if (!restoring) root.saveDraft(root.formMode, firstField.text, secretField.text)
+            }
+
+            onVisibleChanged: restore()
+            Component.onCompleted: restore()
+            Connections {
+              target: root
+              function onFormModeChanged() { form.restore() }
             }
 
             TextField {
@@ -325,8 +364,9 @@ Panel {
               foreground: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              onTextChanged: form.save()
               onAccepted: form.wantsPassword ? secretField.forceActiveFocus() : root.submitForm(text, "")
-              Keys.onEscapePressed: function(e) { root.formMode = ""; e.accepted = true }
+              Keys.onEscapePressed: function(e) { root.cancelForm(); e.accepted = true }
             }
             TextField {
               id: secretField
@@ -337,8 +377,9 @@ Panel {
               foreground: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              onTextChanged: form.save()
               onAccepted: root.submitForm(firstField.text, text)
-              Keys.onEscapePressed: function(e) { root.formMode = ""; e.accepted = true }
+              Keys.onEscapePressed: function(e) { root.cancelForm(); e.accepted = true }
             }
             Row {
               spacing: Style.space(6)
@@ -356,7 +397,7 @@ Panel {
                 foreground: root.foreground
                 fontFamily: root.fontFamily
                 fontSize: Style.font.bodySmall
-                onClicked: root.formMode = ""
+                onClicked: root.cancelForm()
               }
             }
           }
