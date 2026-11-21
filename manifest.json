@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.danfimov.hamachi",
   "name": "Hamachi",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "danfimov",
   "license": "MIT",
   "description": "LogMeIn Hamachi status, networks and peers in the Omarchy bar.",

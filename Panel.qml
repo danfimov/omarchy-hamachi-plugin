@@ -498,8 +498,19 @@ Panel {
       }
 
       ColumnLayout {
+        id: netInfo
         Layout.fillWidth: true
         spacing: Style.space(1)
+
+        // Click the name or subtitle to copy the network ID others need to join.
+        HoverHandler { id: netHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: root.copy(String(block.net.id)) }
+        PanelToolTip {
+          visible: netHover.hovered
+          text: strings.t("copyNetworkId")
+          fontFamily: root.fontFamily
+        }
+
         Text {
           textFormat: Text.PlainText
           Layout.fillWidth: true
